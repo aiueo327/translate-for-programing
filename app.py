@@ -3,14 +3,18 @@ import google.generativeai as genai
 
 # --- 1. API設定 ---
 try:
-    # これからは「Secrets」という安全な場所からキーを読み込みます
+    # Streamlit CloudのSecretsから取得（推奨）
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 except Exception:
-    # ここに直接キーを書き込むのはやめましょう！
-    st.error("APIキーが設定されていません。StreamlitのSecretsに登録してください。")
+    st.error("APIキーが設定されていません。StreamlitのSecretsに登録するか、ローカルの.streamlit/secrets.tomlを設定してください。")
     st.stop()
 
-genai.configure(api_key=GOOGLE_API_KEY)
+# 【重要】v1を強制指定して404エラーを回避
+genai.configure(
+    api_key=GOOGLE_API_KEY,
+    client_options={"api_version": "v1"}
+)
+
 # ページ設定
 st.set_page_config(page_title="Global Code Translator", layout="wide")
 
@@ -37,7 +41,7 @@ with st.sidebar:
     target_code = st.selectbox("プログラミング言語", ["Python", "JavaScript", "TypeScript", "Java", "C++", "SQL", "HTML/CSS"])
     
     st.divider()
-    st.info("404エラー対策のため、利用可能なモデルを自動選択する機能を搭載しています。")
+    st.info("安定版API（v1）を指定し、高速かつエラーが起きにくい設計に最適化しています。")
 
 # --- 4. メインレイアウト ---
 col1, col2 = st.columns([1, 1])
@@ -53,34 +57,10 @@ with col2:
     result_area = st.container(height=550, border=True)
 
     if translate_btn and user_input:
-        with st.spinner("利用可能な最適なAIモデルを探しています..."):
+        with st.spinner("翻訳を実行しています..."):
             try:
-                # --- エラー回避の核心：利用可能なモデルをリストアップ ---
-                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                
-                # 優先順位をつけてモデルを決定
-                target_model = ""
-                priority_list = [
-                    "models/gemini-1.5-flash",
-                    "models/gemini-1.5-flash-latest",
-                    "models/gemini-2.0-flash",
-                    "models/gemini-1.5-pro"
-                ]
-                
-                for p in priority_list:
-                    if p in available_models:
-                        target_model = p
-                        break
-                
-                if not target_model and available_models:
-                    target_model = available_models[0]
-                
-                if not target_model:
-                    st.error("利用可能なGeminiモデルが見つかりませんでした。APIキーの有効性を確認してください。")
-                    st.stop()
-
-                # モデルの初期化
-                model = genai.GenerativeModel(model_name=target_model)
+                # 無駄なAPI通信（list_models）を省き、モデルを直接指定
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
                 # プロンプト作成
                 if mode == "自然言語 ➔ コード":
@@ -120,7 +100,7 @@ with col2:
             except Exception as e:
                 st.error(f"エラーが発生しました: {e}")
                 if "429" in str(e):
-                    st.warning("無料枠の制限に達しました。1分ほど待ってから再度実行してください。")
+                    st.warning("無料枠の制限に達しました。Google Cloudで請求先アカウント（クレカ等）が紐づいているか確認するか、少し待ってから再試行してください。")
     else:
         with result_area:
             st.info("左側に入力して「翻訳を実行」を押してください。")
