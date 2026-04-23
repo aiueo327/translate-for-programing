@@ -54,7 +54,7 @@ with col2:
     result_area = st.container(height=550, border=True)
 
     if translate_btn and user_input:
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
         
         # モードと選択言語に応じた指示（プロンプト）の動的生成
         if mode == "自然言語 ➔ コード":
