@@ -1,24 +1,20 @@
 import streamlit as st
 import google.generativeai as genai
 
-# --- 1. API設定 ---
+# --- 1. APIキーの設定（安全な方法） ---
 try:
-    # Streamlit CloudのSecretsから取得（推奨）
+    # Streamlit Cloudの Secrets から安全に読み込む
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-except Exception:
-    st.error("APIキーが設定されていません。StreamlitのSecretsに登録するか、ローカルの.streamlit/secrets.tomlを設定してください。")
+except KeyError:
+    st.error("APIキーが設定されていません。Streamlit CloudのSecrets設定を確認してください。")
     st.stop()
 
-# 【重要】v1を強制指定して404エラーを回避
-genai.configure(
-    api_key=GOOGLE_API_KEY,
-    client_options={"api_version": "v1"}
-)
+# ここが超重要：余計なオプションは一切つけない！
+genai.configure(api_key=GOOGLE_API_KEY)
 
-# ページ設定
+# --- 2. ページとデザインの設定 ---
 st.set_page_config(page_title="Global Code Translator", layout="wide")
 
-# --- 2. デザイン (CSS) ---
 st.markdown("""
 <style>
     .line-container { border-bottom: 1px solid #333; padding: 10px 0; display: flex; flex-direction: column; }
@@ -26,22 +22,17 @@ st.markdown("""
     .top-content { color: #00d4ff; font-family: 'Consolas', monospace; font-weight: bold; font-size: 1.1em; }
     .bottom-content { color: #e0e0e0; font-family: sans-serif; font-size: 0.95em; margin-top: 4px; line-height: 1.4; }
     .arrow { color: #ff4b4b; margin-right: 8px; font-weight: bold; }
-    .stTextArea textarea { font-family: monospace; }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("🌐 グローバル・コード翻訳機")
-st.caption("行ごとに対比させて、プログラムと自然言語を翻訳します。")
 
-# --- 3. サイドバー設定 ---
+# --- 3. サイドバーの設定 ---
 with st.sidebar:
     st.header("🔧 翻訳設定")
     mode = st.radio("翻訳の方向", ["自然言語 ➔ コード", "コード ➔ 自然言語（解説）"])
     source_lang = st.selectbox("使用する言語", ["日本語", "English"])
     target_code = st.selectbox("プログラミング言語", ["Python", "JavaScript", "TypeScript", "Java", "C++", "SQL", "HTML/CSS"])
-    
-    st.divider()
-    st.info("安定版API（v1）を指定し、高速かつエラーが起きにくい設計に最適化しています。")
 
 # --- 4. メインレイアウト ---
 col1, col2 = st.columns([1, 1])
@@ -50,27 +41,28 @@ with col1:
     st.subheader("📥 入力エリア")
     placeholder_msg = "日本語または英語で指示を入力..." if mode == "自然言語 ➔ コード" else "ソースコードを貼り付け..."
     user_input = st.text_area("Input", height=500, placeholder=placeholder_msg, label_visibility="collapsed")
-    translate_btn = st.button("翻訳・解析を実行 🚀", use_container_width=True)
+    translate_btn = st.button("翻訳を実行 🚀", use_container_width=True)
 
 with col2:
     st.subheader("📤 結果（行対比）")
     result_area = st.container(height=550, border=True)
 
     if translate_btn and user_input:
-        with st.spinner("翻訳を実行しています..."):
+        with st.spinner("AIによる翻訳を実行中..."):
             try:
-                # 無駄なAPI通信（list_models）を省き、モデルを直接指定
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                # --- 5. モデルの指定（最もシンプルで安定した書き方） ---
+                model = genai.GenerativeModel("gemini-1.5-flash")
                 
-                # プロンプト作成
+                # プロンプト（指示書）の作成
                 if mode == "自然言語 ➔ コード":
-                    sys_prompt = f"あなたはプログラミング翻訳機です。入力された{source_lang}の各行を、対応する{target_code}のコードに1行ずつ翻訳してください。解説は一切含めず、入力と同じ行数で出力してください。"
+                    sys_prompt = f"入力された{source_lang}の各行を、対応する{target_code}のコードに1行ずつ翻訳してください。解説は不要。行数を完全に一致させてください。"
                 else:
-                    sys_prompt = f"あなたはコード解説者です。入力された{target_code}の各行を、{source_lang}で1行ずつ簡潔に説明してください。入力のコード1行に対して、説明を必ず1行返し、行数を完全に一致させてください。"
+                    sys_prompt = f"入力された{target_code}の各行を、{source_lang}で1行ずつ簡潔に説明してください。行数を完全に一致させてください。"
 
-                # AI呼び出し
+                # AIの実行
                 response = model.generate_content(f"{sys_prompt}\n\n入力データ:\n{user_input}")
                 
+                # 結果の表示処理
                 input_lines = user_input.split('\n')
                 output_lines = response.text.strip().split('\n')
                 
@@ -87,20 +79,15 @@ with col2:
                             <div class="bottom-content"><span class="arrow">↳</span>{out_txt}</div>
                         </div>
                         """, unsafe_allow_html=True)
-                
-                # ダウンロードボタン
-                st.download_button(
-                    label="📄 結果を保存",
-                    data=response.text,
-                    file_name=f"translated_output.txt",
-                    mime="text/plain",
-                    use_container_width=True
-                )
 
             except Exception as e:
-                st.error(f"エラーが発生しました: {e}")
-                if "429" in str(e):
-                    st.warning("無料枠の制限に達しました。Google Cloudで請求先アカウント（クレカ等）が紐づいているか確認するか、少し待ってから再試行してください。")
+                # エラーが起きた場合のメッセージ
+                error_msg = str(e)
+                st.error("エラーが発生しました。")
+                if "429" in error_msg or "Quota exceeded" in error_msg:
+                    st.warning("⚠️ 無料枠の制限に達しました。1分ほど待ってから再度実行してください。")
+                else:
+                    st.code(error_msg)
     else:
         with result_area:
             st.info("左側に入力して「翻訳を実行」を押してください。")
