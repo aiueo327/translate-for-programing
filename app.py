@@ -3,14 +3,14 @@ import google.generativeai as genai
 
 # --- 1. API設定 ---
 try:
-    # Streamlit CloudのSecretsから取得（推奨）
+    # これからは「Secrets」という安全な場所からキーを読み込みます
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 except Exception:
-    # Secretsがない場合の直接指定（テスト用）
-    GOOGLE_API_KEY = "AIzaSyC4EAcrRMjKRxUqw7Kt1LVTY3CeRYbbJC0"
+    # ここに直接キーを書き込むのはやめましょう！
+    st.error("APIキーが設定されていません。StreamlitのSecretsに登録してください。")
+    st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
-
 # ページ設定
 st.set_page_config(page_title="Global Code Translator", layout="wide")
 
