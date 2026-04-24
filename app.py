@@ -9,7 +9,7 @@ except KeyError:
     st.error("APIキーが設定されていません。Streamlit CloudのSecrets設定を確認してください。")
     st.stop()
 
-# ここが超重要：余計なオプションは一切つけない！
+# 余計なオプション（client_options等）は一切入れない！
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- 2. ページとデザインの設定 ---
@@ -25,7 +25,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🌐 グローバル・コード翻訳機")
+st.title("🌐 グローバル・コード翻訳機 (Gemini 2.0)")
 
 # --- 3. サイドバーの設定 ---
 with st.sidebar:
@@ -33,6 +33,7 @@ with st.sidebar:
     mode = st.radio("翻訳の方向", ["自然言語 ➔ コード", "コード ➔ 自然言語（解説）"])
     source_lang = st.selectbox("使用する言語", ["日本語", "English"])
     target_code = st.selectbox("プログラミング言語", ["Python", "JavaScript", "TypeScript", "Java", "C++", "SQL", "HTML/CSS"])
+    st.info("💡 現在のモデル: gemini-2.0-flash")
 
 # --- 4. メインレイアウト ---
 col1, col2 = st.columns([1, 1])
@@ -48,10 +49,10 @@ with col2:
     result_area = st.container(height=550, border=True)
 
     if translate_btn and user_input:
-        with st.spinner("AIによる翻訳を実行中..."):
+        with st.spinner("Gemini 2.0 が解析中..."):
             try:
-                # --- 5. モデルの指定（最もシンプルで安定した書き方） ---
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                # --- 5. モデルの指定（Gemini 2.0 Flash） ---
+                model = genai.GenerativeModel("gemini-2.0-flash")
                 
                 # プロンプト（指示書）の作成
                 if mode == "自然言語 ➔ コード":
@@ -85,7 +86,7 @@ with col2:
                 error_msg = str(e)
                 st.error("エラーが発生しました。")
                 if "429" in error_msg or "Quota exceeded" in error_msg:
-                    st.warning("⚠️ 無料枠の制限に達しました。1分ほど待ってから再度実行してください。")
+                    st.warning("⚠️ 2.0の無料枠制限に達しました。時間をおいて試すか、コードのモデル指定を 'gemini-1.5-flash' に戻してください。")
                 else:
                     st.code(error_msg)
     else:
